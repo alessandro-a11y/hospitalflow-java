@@ -1,0 +1,50 @@
+# Java / Maven
+*.class
+*.jar
+*.war
+*.ear
+target/
+.classpath
+.factorypath
+.project
+.settings/
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Spring Boot
+application*.properties
+application*.yml
+!application*.example.*
+
+# Ambiente / segredos
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Frontend (Node / npm / yarn / pnpm)
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+*.local
+.npmrc
+.yarn/
+yarn-error.log
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
