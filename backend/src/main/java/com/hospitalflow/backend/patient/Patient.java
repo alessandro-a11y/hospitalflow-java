@@ -1,15 +1,14 @@
-package com.example.demo.patient;
+package com.hospitalflow.backend.patient;
 
-import jakarta.persistence.*;
+import com.hospitalflow.backend.common.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "patients")
-public class Patient {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class Patient extends BaseEntity {
 
     @Column(nullable = false)
     private String name;
@@ -20,9 +19,6 @@ public class Patient {
     private LocalDate birthDate;
     private String phone;
     private String email;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

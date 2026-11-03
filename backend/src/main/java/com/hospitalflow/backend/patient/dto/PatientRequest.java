@@ -1,5 +1,4 @@
-package com.example.demo.patient.dto;
-
+package com.hospitalflow.backend.patient.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;

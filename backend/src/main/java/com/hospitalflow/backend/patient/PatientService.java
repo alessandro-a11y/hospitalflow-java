@@ -1,11 +1,11 @@
-package com.hospitalflow.patient;
+package com.hospitalflow.backend.patient;
 
-import com.hospitalflow.patient.dto.PatientRequest;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
-
+import com.hospitalflow.backend.exception.BusinessRuleException;
+import com.hospitalflow.backend.exception.ResourceNotFoundException;
+import com.hospitalflow.backend.patient.dto.PatientRequest;
 import java.util.List;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
 
 @Service
 public class PatientService {
@@ -20,15 +20,14 @@ public class PatientService {
         return repository.findAll();
     }
 
-    public Patient findById(Long id) {
+    public Patient findById(UUID id) {
         return repository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND, "Paciente não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado"));
     }
 
     public Patient create(PatientRequest req) {
         if (repository.existsByCpf(req.cpf())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "CPF já cadastrado");
+            throw new BusinessRuleException("CPF já cadastrado");
         }
         Patient p = new Patient();
         p.setName(req.name());

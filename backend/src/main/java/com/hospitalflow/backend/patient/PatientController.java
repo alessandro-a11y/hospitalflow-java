@@ -1,11 +1,11 @@
-package com.example.demo.patient;
+package com.hospitalflow.backend.patient;
 
-import com.example.demo.patient.dto.PatientRequest;
+import com.hospitalflow.backend.patient.dto.PatientRequest;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/patients")
@@ -23,7 +23,7 @@ public class PatientController {
     }
 
     @GetMapping("/{id}")
-    public Patient findById(@PathVariable Long id) {
+    public Patient findById(@PathVariable UUID id) {
         return service.findById(id);
     }
 
