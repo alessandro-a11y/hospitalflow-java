@@ -36,15 +36,31 @@ public class AppointmentService {
             .toList();
     }
 
+    public List<AppointmentResponse> findWithFilters(UUID patientId, UUID doctorId,
+                                                      AppointmentStatus status,
+                                                      LocalDateTime startDate,
+                                                      LocalDateTime endDate) {
+        return repository.findWithFilters(patientId, doctorId, status, startDate, endDate).stream()
+            .map(AppointmentResponse::from)
+            .toList();
+    }
+
     public AppointmentResponse schedule(AppointmentRequest req) {
         Patient patient = patientService.findById(req.patientId());
         Doctor doctor = doctorService.findById(req.doctorId());
 
-        // Consulta cancelada libera o horário, por isso fica fora da verificação.
-        boolean slotTaken = repository.existsByDoctorIdAndAppointmentDateAndStatusNot(
+        // Verificar conflito de horário para o médico
+        boolean doctorSlotTaken = repository.existsByDoctorIdAndAppointmentDateAndStatusNot(
             doctor.getId(), req.appointmentDate(), AppointmentStatus.CANCELLED);
-        if (slotTaken) {
+        if (doctorSlotTaken) {
             throw new BusinessRuleException("Médico já possui consulta neste horário");
+        }
+
+        // Verificar conflito de horário para o paciente
+        boolean patientSlotTaken = repository.existsByPatientIdAndAppointmentDateAndStatusNot(
+            patient.getId(), req.appointmentDate(), AppointmentStatus.CANCELLED);
+        if (patientSlotTaken) {
+            throw new BusinessRuleException("Paciente já possui consulta neste horário");
         }
 
         Appointment appointment = new Appointment();
@@ -57,10 +73,11 @@ public class AppointmentService {
 
     public AppointmentResponse confirm(UUID id) {
         Appointment appointment = findById(id);
-        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
-            throw new BusinessRuleException("Apenas consultas agendadas podem ser confirmadas");
+        try {
+            appointment.confirm();
+        } catch (IllegalStateException e) {
+            throw new BusinessRuleException(e.getMessage());
         }
-        appointment.setStatus(AppointmentStatus.CONFIRMED);
         return AppointmentResponse.from(repository.save(appointment));
     }
 
@@ -76,16 +93,57 @@ public class AppointmentService {
             throw new BusinessRuleException("Cancelamento exige antecedência mínima de 2 horas");
         }
 
-        appointment.setStatus(AppointmentStatus.CANCELLED);
+        try {
+            appointment.cancel();
+        } catch (IllegalStateException e) {
+            throw new BusinessRuleException(e.getMessage());
+        }
         return AppointmentResponse.from(repository.save(appointment));
     }
 
     public AppointmentResponse complete(UUID id) {
         Appointment appointment = findById(id);
-        if (appointment.getStatus() != AppointmentStatus.CONFIRMED) {
-            throw new BusinessRuleException("Apenas consultas confirmadas podem ser finalizadas");
+        try {
+            appointment.complete();
+        } catch (IllegalStateException e) {
+            throw new BusinessRuleException(e.getMessage());
         }
-        appointment.setStatus(AppointmentStatus.COMPLETED);
+        return AppointmentResponse.from(repository.save(appointment));
+    }
+
+    public AppointmentResponse reschedule(UUID id, LocalDateTime newDate) {
+        Appointment appointment = findById(id);
+
+        // Validar se a nova data é permitida (futura)
+        if (newDate == null || newDate.isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("Nova data deve ser futura");
+        }
+
+        // Se a data não mudou, não precisa verificar conflitos
+        if (appointment.getAppointmentDate().equals(newDate)) {
+            throw new BusinessRuleException("Nova data deve ser diferente da atual");
+        }
+
+        // Verificar conflito de horário para o médico (consultas canceladas não contam)
+        boolean doctorConflict = repository.existsByDoctorIdAndAppointmentDateAndStatusNot(
+            appointment.getDoctor().getId(), newDate, AppointmentStatus.CANCELLED);
+        if (doctorConflict) {
+            throw new BusinessRuleException("Médico já possui consulta neste horário");
+        }
+
+        // Verificar conflito de horário para o paciente (consultas canceladas não contam)
+        boolean patientConflict = repository.existsByPatientIdAndAppointmentDateAndStatusNot(
+            appointment.getPatient().getId(), newDate, AppointmentStatus.CANCELLED);
+        if (patientConflict) {
+            throw new BusinessRuleException("Paciente já possui consulta neste horário");
+        }
+
+        try {
+            appointment.reschedule(newDate);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            throw new BusinessRuleException(e.getMessage());
+        }
+
         return AppointmentResponse.from(repository.save(appointment));
     }
 

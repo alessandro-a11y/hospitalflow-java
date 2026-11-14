@@ -85,11 +85,30 @@ class AppointmentFlowTest {
     }
 
     @Test
+    void rejectsSamePatientAtSameTime() throws Exception {
+        UUID patientId = newPatient();
+        scheduleAndGetId(newDoctor(), nextWeek, patientId);
+
+        schedule(patientId, newDoctor(), nextWeek)
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Paciente já possui consulta neste horário"));
+    }
+
+    @Test
     void allowsSameDoctorAtAnotherTime() throws Exception {
         UUID doctorId = newDoctor();
         scheduleAndGetId(doctorId, nextWeek);
 
         schedule(newPatient(), doctorId, nextWeek.plusMinutes(30))
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void allowsSamePatientAtAnotherTime() throws Exception {
+        UUID patientId = newPatient();
+        scheduleAndGetId(newDoctor(), nextWeek, patientId);
+
+        schedule(patientId, newDoctor(), nextWeek.plusMinutes(30))
             .andExpect(status().isCreated());
     }
 
@@ -108,6 +127,16 @@ class AppointmentFlowTest {
         action(id, "cancel").andExpect(status().isOk());
 
         schedule(newPatient(), doctorId, nextWeek)
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void cancelledAppointmentFreesTimeForPatient() throws Exception {
+        UUID patientId = newPatient();
+        String id = scheduleAndGetId(newDoctor(), nextWeek, patientId);
+        action(id, "cancel").andExpect(status().isOk());
+
+        schedule(patientId, newDoctor(), nextWeek)
             .andExpect(status().isCreated());
     }
 
@@ -228,6 +257,180 @@ class AppointmentFlowTest {
             .andExpect(jsonPath("$.fieldErrors.appointmentDate").isNotEmpty());
     }
 
+    // --- Novos testes para reagendamento ---
+
+    @Test
+    void reschedulesValidAppointment() throws Exception {
+        String id = scheduleAndGetId(newDoctor(), nextWeek);
+        LocalDateTime newDate = nextWeek.plusDays(1).withSecond(0).withNano(0);
+        String expectedDate = newDate.toString() + ":00";
+
+        mockMvc.perform(patch(URL + "/" + id + "/reschedule")
+                .param("newDate", newDate.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.appointmentDate").value(expectedDate));
+    }
+
+    @Test
+    void reschedulesConfirmedAppointment() throws Exception {
+        String id = scheduleAndGetId(newDoctor(), nextWeek);
+        action(id, "confirm").andExpect(status().isOk());
+        LocalDateTime newDate = nextWeek.plusDays(1).withSecond(0).withNano(0);
+        String expectedDate = newDate.toString() + ":00";
+
+        mockMvc.perform(patch(URL + "/" + id + "/reschedule")
+                .param("newDate", newDate.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.appointmentDate").value(expectedDate));
+    }
+
+    @Test
+    void rejectsRescheduleCompletedAppointment() throws Exception {
+        String id = scheduleAndGetId(newDoctor(), nextWeek);
+        action(id, "confirm").andExpect(status().isOk());
+        action(id, "complete").andExpect(status().isOk());
+        LocalDateTime newDate = nextWeek.plusDays(1);
+
+        mockMvc.perform(patch(URL + "/" + id + "/reschedule")
+                .param("newDate", newDate.withSecond(0).withNano(0).toString()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Apenas consultas agendadas ou confirmadas podem ser reagendadas"));
+    }
+
+    @Test
+    void rejectsRescheduleCancelledAppointment() throws Exception {
+        String id = scheduleAndGetId(newDoctor(), nextWeek);
+        action(id, "cancel").andExpect(status().isOk());
+        LocalDateTime newDate = nextWeek.plusDays(1);
+
+        mockMvc.perform(patch(URL + "/" + id + "/reschedule")
+                .param("newDate", newDate.withSecond(0).withNano(0).toString()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Apenas consultas agendadas ou confirmadas podem ser reagendadas"));
+    }
+
+    @Test
+    void rejectsRescheduleWithDoctorConflict() throws Exception {
+        UUID doctorId = newDoctor();
+        String id1 = scheduleAndGetId(doctorId, nextWeek);
+        String id2 = scheduleAndGetId(doctorId, nextWeek.plusHours(1));
+
+        // Tentar reagendar id2 para o horário de id1
+        mockMvc.perform(patch(URL + "/" + id2 + "/reschedule")
+                .param("newDate", nextWeek.withSecond(0).withNano(0).toString()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Médico já possui consulta neste horário"));
+    }
+
+    @Test
+    void rejectsRescheduleWithPatientConflict() throws Exception {
+        UUID patientId = newPatient();
+        String id1 = scheduleAndGetId(newDoctor(), nextWeek, patientId);
+        String id2 = scheduleAndGetId(newDoctor(), nextWeek.plusHours(1), patientId);
+
+        // Tentar reagendar id2 para o horário de id1
+        mockMvc.perform(patch(URL + "/" + id2 + "/reschedule")
+                .param("newDate", nextWeek.withSecond(0).withNano(0).toString()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Paciente já possui consulta neste horário"));
+    }
+
+    @Test
+    void rejectsRescheduleToPastDate() throws Exception {
+        String id = scheduleAndGetId(newDoctor(), nextWeek);
+        LocalDateTime pastDate = LocalDateTime.now().minusDays(1).withSecond(0).withNano(0);
+
+        mockMvc.perform(patch(URL + "/" + id + "/reschedule")
+                .param("newDate", pastDate.toString()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Nova data deve ser futura"));
+    }
+
+    // --- Novos testes para filtros ---
+
+    @Test
+    void filtersByPatientId() throws Exception {
+        UUID patientId = newPatient();
+        UUID otherPatientId = newPatient();
+        UUID doctorId = newDoctor();
+
+        String id1 = scheduleAndGetId(doctorId, nextWeek.withSecond(0).withNano(0), patientId);
+        scheduleAndGetId(doctorId, nextWeek.plusHours(1).withSecond(0).withNano(0), otherPatientId);
+
+        mockMvc.perform(get(URL).param("patientId", patientId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == '" + id1 + "')].patientId").value(patientId.toString()));
+    }
+
+    @Test
+    void filtersByDoctorId() throws Exception {
+        UUID doctorId1 = newDoctor();
+        UUID doctorId2 = newDoctor();
+        UUID patientId = newPatient();
+
+        String id1 = scheduleAndGetId(doctorId1, nextWeek.withSecond(0).withNano(0), patientId);
+        scheduleAndGetId(doctorId2, nextWeek.plusHours(1).withSecond(0).withNano(0), newPatient());
+
+        mockMvc.perform(get(URL).param("doctorId", doctorId1.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == '" + id1 + "')].doctorId").value(doctorId1.toString()));
+    }
+
+    @Test
+    void filtersByStatus() throws Exception {
+        UUID doctorId = newDoctor();
+        UUID patientId = newPatient();
+
+        String id1 = scheduleAndGetId(doctorId, nextWeek.withSecond(0).withNano(0), patientId);
+        String id2 = scheduleAndGetId(doctorId, nextWeek.plusHours(1).withSecond(0).withNano(0), newPatient());
+        action(id1, "confirm").andExpect(status().isOk());
+
+        mockMvc.perform(get(URL).param("status", "CONFIRMED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == '" + id1 + "')].status").value("CONFIRMED"))
+            .andExpect(jsonPath("$[?(@.id == '" + id2 + "')]").doesNotExist());
+    }
+
+    @Test
+    void filtersByDateRange() throws Exception {
+        UUID doctorId = newDoctor();
+        UUID patientId = newPatient();
+
+        LocalDateTime date1 = nextWeek.withSecond(0).withNano(0);
+        LocalDateTime date2 = nextWeek.plusDays(2).withSecond(0).withNano(0);
+        LocalDateTime date3 = nextWeek.plusDays(5).withSecond(0).withNano(0);
+
+        String id1 = scheduleAndGetId(doctorId, date1, patientId);
+        String id2 = scheduleAndGetId(doctorId, date2, newPatient());
+        scheduleAndGetId(doctorId, date3, newPatient());
+
+        mockMvc.perform(get(URL)
+                .param("startDate", date1.toString())
+                .param("endDate", date2.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == '" + id1 + "')]").exists())
+            .andExpect(jsonPath("$[?(@.id == '" + id2 + "')]").exists());
+    }
+
+    @Test
+    void filtersCombined() throws Exception {
+        UUID doctorId = newDoctor();
+        UUID patientId = newPatient();
+
+        LocalDateTime baseDate = nextWeek.withSecond(0).withNano(0);
+        scheduleAndGetId(doctorId, baseDate, patientId);
+        scheduleAndGetId(doctorId, baseDate.plusHours(1), newPatient());
+        String confirmedId = scheduleAndGetId(doctorId, baseDate.plusDays(1), patientId);
+        action(confirmedId, "confirm").andExpect(status().isOk());
+
+        mockMvc.perform(get(URL)
+                .param("patientId", patientId.toString())
+                .param("doctorId", doctorId.toString())
+                .param("status", "CONFIRMED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == '" + confirmedId + "')].status").value("CONFIRMED"));
+    }
+
     private ResultActions schedule(UUID patientId, UUID doctorId, LocalDateTime date) throws Exception {
         String body = """
             {
@@ -241,7 +444,11 @@ class AppointmentFlowTest {
     }
 
     private String scheduleAndGetId(UUID doctorId, LocalDateTime date) throws Exception {
-        String response = schedule(newPatient(), doctorId, date)
+        return scheduleAndGetId(doctorId, date, newPatient());
+    }
+
+    private String scheduleAndGetId(UUID doctorId, LocalDateTime date, UUID patientId) throws Exception {
+        String response = schedule(patientId, doctorId, date)
             .andExpect(status().isCreated())
             .andReturn().getResponse().getContentAsString();
         return JsonPath.read(response, "$.id");
