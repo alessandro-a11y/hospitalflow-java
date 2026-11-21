@@ -22,7 +22,6 @@ API REST em Java com Spring Boot para o sistema de gestão hospitalar HospitalFl
 ```
 backend/
 ├── pom.xml
-├── README.md
 ├── .env.example
 ├── database/
 │   └── hospitalflow_schema.sql   # Script do esquema PostgreSQL
@@ -33,10 +32,11 @@ backend/
     │   │   ├── config/          # WebConfig (CORS), OpenApiConfig (Swagger), JpaAuditConfig
     │   │   ├── exception/       # GlobalExceptionHandler, ErrorResponse, ResourceNotFoundException, BusinessRuleException
     │   │   ├── common/          # ApiResponse, BaseEntity
-    │   │   ├── patient/         # Implementado (Entity, Controller, Repository, Service, DTOs)
-    │   │   ├── doctor/          # Implementado (Entity, Controller, Repository, Service, DTOs)
-    │   │   ├── appointment/     # Implementado (Entity, Controller, Repository, Service, Status, DTOs)
-    │   │   ├── medicalrecord/   # Implementado (Entity, Controller, Repository, Service, DTOs)
+    │   │   ├── controller/      # Controllers REST (Patient, Doctor, Appointment, MedicalRecord)
+    │   │   ├── service/         # Regras de negócio
+    │   │   ├── repository/      # Repositórios JPA (Spring Data)
+    │   │   ├── entity/          # Entidades JPA e enum AppointmentStatus
+    │   │   ├── dto/             # Requests e responses (records)
     │   │   └── auth/            # Pendente (apenas estrutura)
     │   └── resources/
     │       ├── application.yml
@@ -44,7 +44,7 @@ backend/
     └── test/
         └── java/com/hospitalflow/backend/
             ├── HospitalFlowApplicationTests.java
-            ├── appointment/     # AppointmentFlowTest
+            ├── integration/     # AppointmentFlowTest
             ├── config/          # WebConfigTest
             └── exception/       # Testes de exceções, ErrorResponse e GlobalExceptionHandler
 ```
@@ -264,7 +264,7 @@ Os mesmos passos podem ser feitos pelo Swagger UI (`http://localhost:8081/swagge
 
 ## Como criar novas funcionalidades
 
-1. Crie um pacote de domínio sob `com.hospitalflow.backend.<modulo>` (ex: `patient`, `doctor`).
+1. Adicione as classes do novo módulo em cada camada de `com.hospitalflow.backend`: `controller`, `service`, `repository`, `entity` e `dto`.
 2. As entidades devem estender `com.hospitalflow.backend.common.BaseEntity`.
 3. Use `ResourceNotFoundException` para recursos ausentes (HTTP 404) e
    `BusinessRuleException` para conflitos de negócio (HTTP 409).
