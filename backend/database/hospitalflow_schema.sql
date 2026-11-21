@@ -161,12 +161,77 @@ COMMENT ON COLUMN appointments.status IS 'Appointment status: SCHEDULED, CONFIRM
 
 
 -- ============================================================================
+-- TABLE: medical_records
+-- ============================================================================
+-- Entity: com.hospitalflow.backend.medicalrecord.MedicalRecord
+-- Base: com.hospitalflow.backend.common.BaseEntity
+-- Relationships: ManyToOne -> patients, ManyToOne -> doctors, OneToOne -> appointments
+-- ============================================================================
+CREATE TABLE medical_records (
+    -- Primary key (UUID from BaseEntity)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Audit fields (from BaseEntity)
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+
+    -- Foreign keys
+    patient_id UUID NOT NULL,
+    doctor_id UUID NOT NULL,
+    appointment_id UUID,
+
+    -- Medical record attributes
+    record_date TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    diagnosis VARCHAR(500) NOT NULL,
+    notes TEXT
+);
+
+-- Foreign key constraints
+ALTER TABLE medical_records
+    ADD CONSTRAINT fk_medical_records_patient
+    FOREIGN KEY (patient_id)
+    REFERENCES patients (id)
+    ON DELETE RESTRICT;
+
+ALTER TABLE medical_records
+    ADD CONSTRAINT fk_medical_records_doctor
+    FOREIGN KEY (doctor_id)
+    REFERENCES doctors (id)
+    ON DELETE RESTRICT;
+
+ALTER TABLE medical_records
+    ADD CONSTRAINT fk_medical_records_appointment
+    FOREIGN KEY (appointment_id)
+    REFERENCES appointments (id)
+    ON DELETE SET NULL;
+
+-- Unique constraint: one medical record per appointment
+CREATE UNIQUE INDEX uk_medical_records_appointment ON medical_records (appointment_id)
+    WHERE appointment_id IS NOT NULL;
+
+-- Indexes for foreign keys and common queries
+CREATE INDEX idx_medical_records_patient_id ON medical_records (patient_id);
+CREATE INDEX idx_medical_records_doctor_id ON medical_records (doctor_id);
+CREATE INDEX idx_medical_records_record_date ON medical_records (record_date);
+
+-- Table and column comments
+COMMENT ON TABLE medical_records IS 'Medical records - prontuários médicos';
+COMMENT ON COLUMN medical_records.id IS 'Primary key (UUID)';
+COMMENT ON COLUMN medical_records.created_at IS 'Record creation timestamp (JPA @CreatedDate)';
+COMMENT ON COLUMN medical_records.updated_at IS 'Record last update timestamp (JPA @LastModifiedDate)';
+COMMENT ON COLUMN medical_records.patient_id IS 'FK to patients table (many records per patient)';
+COMMENT ON COLUMN medical_records.doctor_id IS 'FK to doctors table (many records per doctor)';
+COMMENT ON COLUMN medical_records.appointment_id IS 'FK to appointments table (one record per appointment, optional)';
+COMMENT ON COLUMN medical_records.record_date IS 'Date and time the record was created';
+COMMENT ON COLUMN medical_records.diagnosis IS 'Medical diagnosis (required, max 500 chars)';
+COMMENT ON COLUMN medical_records.notes IS 'Additional notes and observations';
+
+-- ============================================================================
 -- NOTES ON MODULES NOT YET IMPLEMENTED
 -- ============================================================================
 -- The following modules exist as package structures only and are NOT included
 -- in this schema. Tables will be added when the modules are implemented:
 --
--- medicalrecord (prontuários): Only package-info.java exists
 -- auth (autenticação): Only package-info.java exists
 --
 -- When these modules are implemented, new migrations should be created

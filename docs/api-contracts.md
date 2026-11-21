@@ -189,7 +189,7 @@ Os campos abaixo são **propostas** baseadas nos requisitos funcionais do projet
 
 ## Como os colegas devem integrar
 
-1. Cada módulo implementa seu controller, service, repository e entidade sob seu pacote dedicado (ex: `com.hospitalflow.backend.patient`).
+1. A arquitetura segue package-by-layer: controllers em `com.hospitalflow.backend.controller`, services em `com.hospitalflow.backend.service`, repositories em `com.hospitalflow.backend.repository`, entidades em `com.hospitalflow.backend.entity` e DTOs em `com.hospitalflow.backend.dto`.
 2. As entidades devem estender `com.hospitalflow.backend.common.BaseEntity`.
 3. Use `ResourceNotFoundException` para recursos ausentes (HTTP 404).
 4. Use `BusinessRuleException` para conflitos de negócio (HTTP 409).

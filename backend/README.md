@@ -33,10 +33,11 @@ backend/
     │   │   ├── config/          # WebConfig (CORS), OpenApiConfig (Swagger), JpaAuditConfig
     │   │   ├── exception/       # GlobalExceptionHandler, ErrorResponse, ResourceNotFoundException, BusinessRuleException
     │   │   ├── common/          # ApiResponse, BaseEntity
-    │   │   ├── patient/         # Implementado (Entity, Controller, Repository, Service, DTOs)
-    │   │   ├── doctor/          # Implementado (Entity, Controller, Repository, Service, DTOs)
-    │   │   ├── appointment/     # Implementado (Entity, Controller, Repository, Service, Status, DTOs)
-    │   │   ├── medicalrecord/   # Implementado (Entity, Controller, Repository, Service, DTOs)
+    │   │   ├── controller/      # PatientController, DoctorController, AppointmentController, MedicalRecordController
+    │   │   ├── service/         # PatientService, DoctorService, AppointmentService, MedicalRecordService
+    │   │   ├── repository/      # PatientRepository, DoctorRepository, AppointmentRepository, MedicalRecordRepository
+    │   │   ├── entity/          # Patient, Doctor, Appointment, MedicalRecord, AppointmentStatus
+    │   │   ├── dto/             # Todos os DTOs (Request/Response records)
     │   │   └── auth/            # Pendente (apenas estrutura)
     │   └── resources/
     │       ├── application.yml
@@ -44,7 +45,7 @@ backend/
     └── test/
         └── java/com/hospitalflow/backend/
             ├── HospitalFlowApplicationTests.java
-            ├── appointment/     # AppointmentFlowTest
+            ├── integration/     # AppointmentFlowTest
             ├── config/          # WebConfigTest
             └── exception/       # Testes de exceções, ErrorResponse e GlobalExceptionHandler
 ```
